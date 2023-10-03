@@ -1,5 +1,9 @@
 Unofficial Telegram Wallet API (https://t.me/wallet)
 
+```bazaar
+pip install pyTelegramWalletApi
+```
+
 Send and receive tokens | Trade on P2P Market
 
 ```python
