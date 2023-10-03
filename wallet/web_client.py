@@ -14,8 +14,8 @@ class Client:
         self.driver.get('https://web.telegram.org/a/#1985737506')
 
     @classmethod
-    def auth(cls, profile_name, temp_dir_path=None):
-        c = Client(headless=False, profile=profile_name, temp_dir_path=temp_dir_path)
+    def auth(cls, profile, temp_dir_path=None):
+        c = Client(headless=False, profile=profile, temp_dir_path=temp_dir_path)
         input('[!] Complite auth in browser and click any key to continue...')
         return c
 

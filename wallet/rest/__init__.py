@@ -351,19 +351,20 @@ class Wallet:
     def get_transaction_details(self, tx_id) -> dict:
         return self.request('GET', f'/api/v1/transactions/details/{tx_id}/')
 
-    def send_to_user(self, amount, currency, receiver_tg_id):
-        v = self.withdrawals_validate_amount(amount, currency, receiver_tg_id)
-
-        if v['status'] == 'ok':
-
-            json_data = {
-                'amount': amount,
-                'currency': currency
-            }
-            return self.request('POST', f'/api/v1/transfers/create_transfer_request/', json_data=json_data)
-
-        else:
-            raise Exception(f'[!] Error withdrawals_validate_amount: {v}')
+    # not realized
+    # def send_to_user(self, amount, currency, receiver_tg_id):
+    #     v = self.withdrawals_validate_amount(amount, currency, receiver_tg_id)
+    #
+    #     if v['status'] == 'ok':
+    #
+    #         json_data = {
+    #             'amount': amount,
+    #             'currency': currency
+    #         }
+    #         return self.request('POST', f'/api/v1/transfers/create_transfer_request/', json_data=json_data)
+    #
+    #     else:
+    #         raise Exception(f'[!] Error withdrawals_validate_amount: {v}')
 
     def send_to_address(self, amount, currency, address):
         """
