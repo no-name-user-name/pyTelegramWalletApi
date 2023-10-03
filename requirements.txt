@@ -1,3 +1,6 @@
-requests
+requests~=2.31.0
 selenium-wire
 pytest
+selenium~=4.13.0
+openpyxl~=3.1.2
+setuptools~=68.1.2
