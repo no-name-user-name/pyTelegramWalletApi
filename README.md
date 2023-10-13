@@ -1,10 +1,44 @@
-Unofficial Telegram Wallet API (https://t.me/wallet)
+<br/>
+<p align="center">
+  <a href="https://github.com/no-name-user-name/pyTelegramWalletApi">
+    <img src="https://wallet.tg/icon.svg" alt="Logo" width="80" height="80">
+  </a>
+
+  <h3 align="center">Telegram Wallet API</h3>
+
+  <p align="center">
+    Unofficial library for managing your personal Wallet account
+    <br/>
+    <br/>
+  </p>
+</p>
+
+
+
+## Table Of Contents
+
+* [About the Project](#about-the-project)
+* [Built With](#built-with)
+* [Getting Started](#getting-started)
+  * [Example](#example)
+* [Realised methods](#realised-methods)
+
+## About The Project
+
+Send and receive tokens | Trade on P2P Market
+
+## Built With
+
+To obtain an authorization token, the "selenium" library is used.
+Working with the API is implemented using "requests"
+
+## Getting Started
 
 ```bazaar
 pip install pyTelegramWalletApi
 ```
 
-Send and receive tokens | Trade on P2P Market
+### Example
 
 ```python
 import time
@@ -46,6 +80,9 @@ print(f'[*] Tx status: {status} | {tx_link}')
 [*] Tx status: success | https://tonscan.org/tx/....
 """
 ```
+
+
+## Realised methods
 
 Wallet Account Methods:
 - send_to_address()
