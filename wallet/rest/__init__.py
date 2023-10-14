@@ -17,7 +17,7 @@ class Wallet:
             raise Exception('[!] Bad auth token!')
 
     def request(self, method, path, json_data=None, params=None, max_attempts=3, delay=2):
-        if 'p2p/public-api' in path:
+        if '/public-api/' in path:
             self.session.headers['authorization'] = 'Bearer ' + self.auth_token
         else:
             self.session.headers['authorization'] = self.auth_token
