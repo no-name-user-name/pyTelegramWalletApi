@@ -1,5 +1,5 @@
 import pprint
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 
 @dataclass
@@ -168,6 +168,7 @@ class Offer:
     orderVolumeLimits: OrderVolumeLimits
     paymentMethods: list[PaymentMethod]
     paymentDetails: list[PaymentDetails]
+    profit_percent: float = None
 
     @staticmethod
     def from_dict(obj: dict) -> 'Offer':
@@ -191,6 +192,8 @@ class Offer:
         return Offer(_id, _number, _user, _type, _price, _availableVolume, _orderAmountLimits, _orderVolumeLimits,
                      _paymentMethods, _paymentDetails)
 
+    def to_dict(self):
+        return {k: str(v) for k, v in asdict(self).items()}
 
 @dataclass
 class OwnOffer:
@@ -226,6 +229,9 @@ class OwnOffer:
 
         return OwnOffer(_id, _number, _status, _type, _price, _availableVolume, _orderAmountLimits, _orderVolumeLimits,
                         _paymentMethods, _paymentMethods)
+
+    def to_dict(self):
+        return {k: str(v) for k, v in asdict(self).items()}
 
 
 class ActionTypes:
