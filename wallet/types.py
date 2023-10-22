@@ -1,100 +1,231 @@
-class PaymentMethods:
-    def __init__(self, data):
-        self.code = data['code']
-        self.name = data['name']
-        self.origin_name_locale = data['originNameLocale']
-        self.name_eng = data['nameEng']
+import pprint
+from dataclasses import dataclass
 
 
-class AttrValues:
-    def __init__(self, data):
-        self.name = data['name']
-        self.value = data['value']
+@dataclass
+class Value:
+    name: str
+    value: str
+
+    @staticmethod
+    def from_dict(obj: dict) -> 'Value':
+        _name = str(obj.get("name"))
+        _value = str(obj.get("value"))
+        return Value(_name, _value)
 
 
+@dataclass
 class Attributes:
-    def __init__(self, data):
-        self.version = data['version']
-        self.values = [AttrValues(value) for value in data['values']]
+    version: str
+    values: list[Value]
+
+    @staticmethod
+    def from_dict(obj: dict) -> 'Attributes':
+        _version = str(obj.get("version"))
+        _values = [Value.from_dict(y) for y in obj.get("values")]
+        return Attributes(_version, _values)
 
 
-class PaymentDetails:
-    def __init__(self, data):
+@dataclass
+class AvailableVolume:
+    currencyCode: str
+    amount: float
 
-        self.id = data['id']
-        self.userId = data['userId']
-        self.currency = data['currency']
-        self.attributes = Attributes(data['attributes'])
-        self.name = data['name']
-
-        if type(data['paymentMethod']) == dict:
-            self.payment_method = PaymentMethods(data['paymentMethod'])
-        else:
-            self.payment_method = [PaymentMethods(method) for method in data['paymentMethod']]
+    @staticmethod
+    def from_dict(obj: dict) -> 'AvailableVolume':
+        _currencyCode = str(obj.get("currencyCode"))
+        _amount = float(obj.get("amount"))
+        return AvailableVolume(_currencyCode, _amount)
 
 
-class UserStatistic:
-    def __init__(self, data):
-        self.success_percent = data['successPercent']
-        self.success_rate = data['successRate']
-        self.total_orders_count = data['totalOrdersCount']
-        self.user_id = data['userId']
+@dataclass
+class OrderAmountLimits:
+    currencyCode: str
+    min: float
+    max: float
+    approximate: bool
+
+    @staticmethod
+    def from_dict(obj: dict) -> 'OrderAmountLimits':
+        _currencyCode = str(obj.get("currencyCode"))
+        _min = float(obj.get("min"))
+        _max = float(obj.get("max"))
+        _approximate = obj.get('approximate')
+        return OrderAmountLimits(_currencyCode, _min, _max, _approximate)
 
 
+@dataclass
+class OrderVolumeLimits:
+    currencyCode: str
+    min: float
+    max: float
+    approximate: bool
+
+    @staticmethod
+    def from_dict(obj: dict) -> 'OrderVolumeLimits':
+        _currencyCode = str(obj.get("currencyCode"))
+        _min = float(obj.get("min"))
+        _max = float(obj.get("max"))
+        _approximate = obj.get('approximate')
+        return OrderVolumeLimits(_currencyCode, _min, _max, _approximate)
+
+
+@dataclass
+class PaymentMethod:
+    code: str
+    name: str
+    originNameLocale: str
+    nameEng: str
+
+    @staticmethod
+    def from_dict(obj: dict) -> 'PaymentMethod':
+        _code = str(obj.get("code"))
+        _name = str(obj.get("name"))
+        _originNameLocale = str(obj.get("originNameLocale"))
+        _nameEng = str(obj.get("nameEng"))
+        return PaymentMethod(_code, _name, _originNameLocale, _nameEng)
+
+
+@dataclass
+class Price:
+    type: str
+    baseCurrencyCode: str
+    quoteCurrencyCode: str
+    value: float
+
+    @staticmethod
+    def from_dict(obj: dict) -> 'Price':
+        _type = str(obj.get("type"))
+        _baseCurrencyCode = str(obj.get("baseCurrencyCode"))
+        _quoteCurrencyCode = str(obj.get("quoteCurrencyCode"))
+        _value = float(obj.get("value"))
+        return Price(_type, _baseCurrencyCode, _quoteCurrencyCode, _value)
+
+
+@dataclass
+class Statistics:
+    userId: int
+    totalOrdersCount: int
+    successRate: str
+    successPercent: int
+
+    @staticmethod
+    def from_dict(obj: dict) -> 'Statistics':
+        _userId = int(obj.get("userId"))
+        _totalOrdersCount = int(obj.get("totalOrdersCount"))
+        _successRate = str(obj.get("successRate"))
+        _successPercent = int(obj.get("successPercent"))
+        return Statistics(_userId, _totalOrdersCount, _successRate, _successPercent)
+
+
+@dataclass
 class User:
-    def __init__(self, data):
-        self.avatar_code = data['avatarCode']
-        self.nickname = data['nickname']
-        self.userId = data['userId']
-        self.statistics = UserStatistic(data['statistics'])
+    userId: int
+    nickname: str
+    avatarCode: str
+    statistics: Statistics
+    isVerified: bool
+
+    @staticmethod
+    def from_dict(obj: dict) -> 'User':
+        _userId = int(obj.get("userId"))
+        _nickname = str(obj.get("nickname"))
+        _avatarCode = str(obj.get("avatarCode"))
+        _statistics = Statistics.from_dict(obj.get("statistics"))
+        _isVerified = obj.get('isVerified')
+        return User(_userId, _nickname, _avatarCode, _statistics, _isVerified)
 
 
+@dataclass
+class PaymentDetails:
+    id: int
+    userId: int
+    paymentMethod: PaymentMethod
+    currency: str
+    attributes: Attributes
+    name: str
+
+    @staticmethod
+    def from_dict(obj: dict) -> 'PaymentDetails':
+        _id = int(obj.get("id"))
+        _userId = int(obj.get("userId"))
+        _paymentMethod = PaymentMethod.from_dict(obj.get("paymentMethod"))
+        _currency = str(obj.get("currency"))
+        _attributes = Attributes.from_dict(obj.get("attributes"))
+        _name = str(obj.get("name"))
+        return PaymentDetails(_id, _userId, _paymentMethod, _currency, _attributes, _name)
+
+
+@dataclass
 class Offer:
-    def __init__(self, data: dict, rate=None):
+    id: int
+    number: str
+    user: User
+    type: str
+    price: Price
+    availableVolume: float
+    orderAmountLimits: OrderAmountLimits
+    orderVolumeLimits: OrderVolumeLimits
+    paymentMethods: list[PaymentMethod]
+    paymentDetails: list[PaymentDetails]
 
-        self.id = int(data['id'])
-        self.number = data['number']
+    @staticmethod
+    def from_dict(obj: dict) -> 'Offer':
+        _id = int(obj.get("id"))
+        _number = str(obj.get("number"))
+        _user = User.from_dict(obj.get("user"))
+        _type = str(obj.get("type"))
+        _price = Price.from_dict(obj.get("price"))
+        _availableVolume = float(obj.get("availableVolume"))
+        _orderAmountLimits = OrderAmountLimits.from_dict(obj.get("orderAmountLimits"))
+        _orderVolumeLimits = OrderVolumeLimits.from_dict(obj.get("orderVolumeLimits"))
 
-        if 'status' in data:
-            self.status = data['status']
+        _paymentMethods = []
+        _paymentDetails = []
 
-        self.type = data['type']
+        if obj.get('paymentDetails'):
+            _paymentDetails = [PaymentDetails.from_dict(y) for y in obj.get("paymentDetails")]
+        if obj.get('paymentMethods'):
+            _paymentMethods = [PaymentMethod.from_dict(y) for y in obj.get("paymentMethods")]
 
-        self.available_volume = data['availableVolume']
-        if 'amount' in data['availableVolume']:
-            self.available_volume = data['availableVolume']['amount']
+        return Offer(_id, _number, _user, _type, _price, _availableVolume, _orderAmountLimits, _orderVolumeLimits,
+                     _paymentMethods, _paymentDetails)
 
-        self.available_volume = float(self.available_volume)
 
-        self.base_currency_code = data['price']['baseCurrencyCode']
-        self.quote_currency_code = data['price']['quoteCurrencyCode']
+@dataclass
+class OwnOffer:
+    id: int
+    number: str
+    status: str
+    type: str
+    price: Price
+    availableVolume: AvailableVolume
+    orderAmountLimits: OrderAmountLimits
+    orderVolumeLimits: OrderVolumeLimits
+    paymentMethods: list[PaymentMethod]
+    paymentDetails: list[PaymentDetails]
 
-        self.price_type = data['price']['type']
+    @staticmethod
+    def from_dict(obj: dict) -> 'OwnOffer':
+        _id = int(obj.get("id"))
+        _number = str(obj.get("number"))
+        _status = str(obj.get("status"))
+        _type = str(obj.get("type"))
+        _price = Price.from_dict(obj.get("price"))
+        _availableVolume = AvailableVolume.from_dict(obj.get("availableVolume"))
+        _orderAmountLimits = OrderAmountLimits.from_dict(obj.get("orderAmountLimits"))
+        _orderVolumeLimits = OrderVolumeLimits.from_dict(obj.get("orderVolumeLimits"))
 
-        if self.price_type == 'FIXED':
-            self.price = float(data['price']['value'])
+        _paymentMethods = []
+        _paymentDetails = []
 
-            if rate is None:
-                self.profit_percent = None
-            else:
-                self.profit_percent = round(100 + (self.price - rate) / rate * 100, 4)
-        else:
-            self.price = float(data['price']['estimated'])
-            self.profit_percent = round(float(data['price']['value']))
+        if obj.get('paymentDetails'):
+            _paymentDetails = [PaymentDetails.from_dict(y) for y in obj.get("paymentDetails")]
+        if obj.get('paymentMethods'):
+            _paymentMethods = [PaymentMethod.from_dict(y) for y in obj.get("paymentMethods")]
 
-        self.min_order_amount = float(data['orderAmountLimits']['min'])
-        self.max_order_amount = float(data['orderAmountLimits']['max'])
-
-        self.max_order_volume = float(data['orderVolumeLimits']['max'])
-        self.max_order_volume = float(data['orderVolumeLimits']['max'])
-
-        if 'paymentDetails' in data:
-            self.payment_details = [PaymentDetails(pd) for pd in data['paymentDetails']]
-        elif 'paymentMethods' in data:
-            self.payment_method = [PaymentMethods(method) for method in data['paymentMethods']]
-
-        if 'user' in data:
-            self.user = User(data['user'])
+        return OwnOffer(_id, _number, _status, _type, _price, _availableVolume, _orderAmountLimits, _orderVolumeLimits,
+                        _paymentMethods, _paymentMethods)
 
 
 class ActionTypes:
@@ -110,7 +241,7 @@ class Action:
             action_type: ActionTypes,
             order_id: int,
             offer_type: str,
-            user_stats: UserStatistic,
+            user_stats: Statistics,
             old_price=None,
             new_price=None,
             old_volume=None,

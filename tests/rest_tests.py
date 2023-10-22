@@ -1,4 +1,5 @@
 from wallet.rest import Wallet
+from wallet.types import Offer, OwnOffer
 
 AUTH_TOKEN = ''
 ADDRESS = ''
@@ -6,9 +7,22 @@ ADDRESS = ''
 w = Wallet(AUTH_TOKEN)
 
 
+def test_get_own_p2p_offer():
+    offers = w.get_own_p2p_offers()
+    assert isinstance(offers[0], OwnOffer)
+    offer = w.get_own_p2p_offer(offer_id=offers[0].id)
+    offer = w.get_own_p2p_offer(tag=offers[0].number)
+    assert isinstance(offer, OwnOffer | [])
+
+
 def test_get_user_balance():
     balance = w.get_user_balance()
     assert 'available_balance' in balance
+
+
+def test_get_p2p_market():
+    market = w.get_p2p_market('TON', 'RUB')
+    assert isinstance(market[0], Offer)
 
 
 def test_get_user_payment():
@@ -16,7 +30,7 @@ def test_get_user_payment():
     assert 'data' in up
 
 
-def get_user_p2p_order_history():
+def test_get_user_p2p_order_history():
     uoh = w.get_user_p2p_order_history()
     assert 'data' in uoh
 

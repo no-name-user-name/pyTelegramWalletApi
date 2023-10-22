@@ -24,4 +24,3 @@ class TelegramDriver:
         self.driver = webdriver.Chrome(chrome_options=options)
 
         self.driver.implicitly_wait(7)
-        self.token = None

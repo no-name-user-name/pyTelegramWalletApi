@@ -1,7 +1,7 @@
 import time
 import requests
 
-from wallet.types import Offer
+from wallet.types import Offer, OwnOffer
 
 
 class Wallet:
@@ -45,10 +45,10 @@ class Wallet:
     def get_user_balance(self, currency='TON') -> dict:
         return self.request('GET', f'/api/v1/accounts/{currency}/')
 
-    def get_user_p2p_payment(self):
+    def get_user_p2p_payment(self) -> dict:
         return self.request('POST', '/p2p/public-api/v2/payment-details/get/by-user-id')
 
-    def get_user_p2p_order_history(self, offset=0, limit=200):
+    def get_user_p2p_order_history(self, offset=0, limit=200) -> dict:
         json_data = {
             "offset": offset,
             "limit": limit
@@ -61,7 +61,7 @@ class Wallet:
             offer_id: int = None,
             offer_type=None,
             status: str = 'ACTIVE'
-    ) -> Offer:
+    ) -> OwnOffer:
         """
         :param offer_type:  PURCHASE | SALE
         :param offer_id:
@@ -70,6 +70,9 @@ class Wallet:
         :return: Offer
         """
         offers = self.get_own_p2p_offers(status=status)
+
+        if not offers:
+            return []
 
         if tag is not None:
             return [o for o in offers if o.number == tag][0]
@@ -83,7 +86,7 @@ class Wallet:
         else:
             return offers[0]
 
-    def get_own_p2p_offers(self, order_type: str = None, status: str = 'ACTIVE') -> list[Offer]:
+    def get_own_p2p_offers(self, order_type: str = None, status: str | None = None) -> list[OwnOffer]:
         """
         :param status: None | ACTIVE | INACTIVE
         :param order_type: None | PURCHASE | SALE
@@ -91,13 +94,13 @@ class Wallet:
         """
         result = self.request('POST', '/p2p/public-api/v2/offer/user-own/list')
 
-        offers = [Offer(data) for data in result['data']]
+        offers = [OwnOffer.from_dict(json_data) for json_data in result['data']]
 
         if order_type is not None:
             offers = [offer for offer in offers if offer.type == order_type]
 
         if status is not None:
-            offers = [offer for offer in offers if offer.status == status]
+            offers = [offer for offer in offers if offer.type == status]
 
         return offers
 
@@ -282,13 +285,13 @@ class Wallet:
         }
         return self.request('POST', '/p2p/public-api/v2/offer/deactivate', json_data)
 
-    def get_p2p_payment_methods_by_currency(self, currency='RUB'):
+    def get_p2p_payment_methods_by_currency(self, currency='RUB') -> dict:
         json_data = {
             "currencyCode": currency
         }
         return self.request('POST', '/p2p/public-api/v2/payment-details/get-methods/by-currency-code', json_data)
 
-    def get_rate(self, base='TON', quote='RUB'):
+    def get_rate(self, base='TON', quote='RUB') -> float:
         result = self.request('GET', f'/rates/public-api/v1/rate/crypto-to-fiat?base={base}&quote={quote}')
         return float(result['data']['rate'])
 
@@ -298,13 +301,11 @@ class Wallet:
             quote_currency_code,
             offer_type='SALE',
             offset=0, limit=100,
-            rate=None,
             desired_amount=None
     ) -> list[Offer]:
         """
 
         :param desired_amount:
-        :param rate:
         :param base_currency_code: TON | BTC
         :param quote_currency_code: RUB | KZT etc.
         :param offer_type: SALE | PURCHASE
@@ -321,7 +322,7 @@ class Wallet:
             "desiredAmount": desired_amount
         }
         market = self.request('POST', '/p2p/public-api/v2/offer/depth-of-market', json_data)
-        return [Offer(data, rate) for data in market['data']]
+        return [Offer.from_dict(json_data) for json_data in market['data']]
 
     def get_p2p_offer(self, offer_id: int):
         json_data = {
@@ -336,10 +337,10 @@ class Wallet:
             self.p2p_offer_deactivate(o.id, o.type)
             amount = self.get_user_balance('TON')['available_balance']
         else:
-            amount = o.available_volume + add_amount + add_amount * 0.9 / 100
+            amount = o.availableVolume.amount + add_amount + add_amount * 0.9 / 100
 
         r = self.replace_p2p_offer(o.id, o.type, amount)
-        return Offer(r['data'])
+        return OwnOffer.from_dict(r['data'])
 
     def get_transactions(self, limit=10, last_id=None) -> dict:
 
