@@ -193,7 +193,7 @@ class Offer:
                      _paymentMethods, _paymentDetails)
 
     def to_dict(self):
-        return {k: str(v) for k, v in asdict(self).items()}
+        return {k: v for k, v in asdict(self).items()}
 
 @dataclass
 class OwnOffer:
@@ -231,7 +231,7 @@ class OwnOffer:
                         _paymentMethods, _paymentMethods)
 
     def to_dict(self):
-        return {k: str(v) for k, v in asdict(self).items()}
+        return {k: v for k, v in asdict(self).items()}
 
 
 class ActionTypes:
