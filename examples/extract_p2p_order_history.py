@@ -3,9 +3,7 @@ import openpyxl
 from wallet.rest import Wallet
 from wallet.web_client import Client
 
-# login to tg in chrome driver if it needed
-web_client = Client.auth(profile='main')
-# web_client = Client('profile='main'')
+web_client = Client(profile='main')
 
 token = web_client.get_token()
 

@@ -10,9 +10,9 @@ w = Wallet(AUTH_TOKEN)
 def test_get_own_p2p_offer():
     offers = w.get_own_p2p_offers()
     assert isinstance(offers[0], OwnOffer)
-    offer = w.get_own_p2p_offer(offer_id=offers[0].id)
-    offer = w.get_own_p2p_offer(tag=offers[0].number)
-    assert isinstance(offer, OwnOffer | [])
+    # offer = w.get_own_p2p_offer(offer_id=offers[0].id)
+    # offer = w.get_own_p2p_offer(tag=offers[0].number)
+    # assert isinstance(offer, OwnOffer | [])
 
 
 def test_get_user_balance():

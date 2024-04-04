@@ -1,3 +1,4 @@
+import os.path
 import time
 
 from selenium.webdriver.common.by import By
@@ -9,6 +10,12 @@ from wallet.selenium import TelegramDriver
 
 class Client:
     def __init__(self, headless=True, profile='main', temp_dir_path=None):
+
+        full_dir_path = '_temp/profile_' + str(profile)
+        if not os.path.isdir(full_dir_path):
+            os.makedirs(full_dir_path)
+            self.auth(profile=profile, temp_dir_path=temp_dir_path)
+
         self.tgd = TelegramDriver(profile=profile, is_headless=headless, temp_dir_path=temp_dir_path)
         self.driver = self.tgd.driver
         self.driver.get('https://web.telegram.org/a/#1985737506')
@@ -16,8 +23,13 @@ class Client:
     @classmethod
     def auth(cls, profile, temp_dir_path=None):
         c = Client(headless=False, profile=profile, temp_dir_path=temp_dir_path)
-        input('[!] Complite auth in browser and click any key to continue...')
-        return c
+        print('[!] Connect Telegram Account')
+
+        while True:
+            if c.driver.current_url == 'https://web.telegram.org/a/#1985737506':
+                return c
+            else:
+                time.sleep(1)
 
     def get_token(self) -> str:
         print('[*] Starting parse wallet authorization token...')

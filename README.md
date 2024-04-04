@@ -45,11 +45,8 @@ import time
 
 from wallet import Client, Wallet
 
-# for the first tg login
-c = Client.auth(profile='main')
-
-# chromedriver headless mode for authorized tg account
-# c = Client(profile='main')
+# singin/singup to tg account
+c = Client(profile='main')
 
 # get wallet auth token
 auth_token = c.get_token()
