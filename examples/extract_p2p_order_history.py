@@ -1,44 +1,48 @@
+import time
+
 import openpyxl
 
 from wallet.rest import Wallet
-from wallet.web_client import Client
+from wallet.types import Order
+# from wallet.web_client import Client
 
-web_client = Client(profile='main')
+# web_client = Client(profile='main')
+# auth_token = web_client.get_token()
 
-token = web_client.get_token()
-
-w = Wallet(auth_token=token)
+w = Wallet.token_from_file('../token.txt')
 
 offset = 0
 limit = 200
 i = 1
+history: list[Order] = []
 temp = []
 
-history = w.get_user_p2p_order_history(offset)
+history += w.get_own_p2p_order_history(offset, limit, status='ALL_COMPLETED')
 
-if history['data']:
-    for row in history['data']:
+while len(history) / i == limit:
+    time.sleep(1)
 
-        # filter | Only COMPLETED orders
-        if row['status'] != 'COMPLETED':
-            continue
+    i += 1
+    offset += limit
+    history += w.get_own_p2p_order_history(offset, limit, status='ALL_COMPLETED')
+    print(len(history))
+    break
 
-        temp.append(
-            (
-                i,
-                row['number'],
-                row['offerType'],
-                row['buyer']['nickname'],
-                row['seller']['nickname'],
-                round(float(row['price']['value']), 2),
-                round(float(row['volume']['amount']), 2),
-                round(float(row['amount']['amount']), 2),
-                row['paymentDetails']['paymentMethod']['name'],
-                row['acceptDateTime'],
-            )
+for order in history:
+    temp.append(
+        (
+            i,
+            order.number,
+            order.offerType,
+            order.buyer.nickname,
+            order.seller.nickname,
+            round(order.price.value, 2),
+            round(order.volume.amount, 2),
+            round(order.amount.amount, 2),
+            order.paymentDetails.paymentMethod.name,
+            order.acceptDateTime,
         )
-        i += 1
-        offset += limit
+    )
 
 wb = openpyxl.Workbook()
 work_list = wb.active
@@ -47,11 +51,8 @@ work_list.append(
     ('№', 'OrderID', 'Type ', 'Buyer', 'Seller', 'Price',
      'Volume', "Sum", "Payment Method", "Order End Date")
 )
+
 for row in temp:
-    try:
-        work_list.append(row)
-    except Exception as e:
-        print(row)
-        raise
+    work_list.append(row)
 
 wb.save('my_orders.xlsx')

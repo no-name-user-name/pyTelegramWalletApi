@@ -7,7 +7,7 @@ long_description = (this_directory / "README.md").read_text()
 
 setup(
     name='pyTelegramWalletApi',
-    version='0.2.17',
+    version='0.2.3',
     author='no-name-user-name',
     description='Telegram Wallet API',
     packages=find_packages(),

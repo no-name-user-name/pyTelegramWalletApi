@@ -1,133 +1,279 @@
+import hashlib
 import time
+import uuid
+
 import requests
 
-from wallet.types import Offer, OwnOffer
+from wallet.types import Offer, Balances, BalanceAccount, TxResponse, TxDetails, Order, MarketOffer
 
 
 class Wallet:
-    def __init__(self, auth_token: str):
+    def __init__(self, auth_token: str, log_response=False, token_file_path=None):
+        self.token_file_path = token_file_path
+        self.log_response = log_response
         self.auth_token = auth_token
         self.session = requests.Session()
         self.session.headers = {
             'content-type': 'application/json',
         }
+
         self.endpoint = 'https://walletbot.me'
 
         if auth_token == '' or len(auth_token) < 30:
             raise Exception('[!] Bad auth token!')
 
-    def request(self, method, path, json_data=None, params=None, max_attempts=3, delay=2):
-        if '/public-api/' in path:
+    @staticmethod
+    def token_from_file(path, log_response=False):
+        with open(path, 'r') as f:
+            auth_token = f.read()
+        return Wallet(auth_token, log_response, token_file_path=path)
+
+    def update_token(self):
+        """ For dynamically token update from "token_file_path"
+
+        :return:
+        """
+        if self.token_file_path is None:
+            raise Exception('[!] token_file_path not set!')
+        with open(self.token_file_path, 'r') as f:
+            self.auth_token = f.read()
+
+    def request(self, path: str, api_version: str = "api/v1", method: str = "GET", json_data=None, params=None,
+                max_attempts=3):
+
+        public_apis = ['p2p/public-api/v2', 'users/public-api/v2', 'rates/public-api/v1']
+
+        if api_version in public_apis or api_version == 'v2api':
             self.session.headers['authorization'] = 'Bearer ' + self.auth_token
         else:
             self.session.headers['authorization'] = self.auth_token
+
+        url = f"{self.endpoint}/{api_version}/{path}"
 
         counter = 0
         while counter < max_attempts:
             counter += 1
             try:
-                response = self.session.request(method, self.endpoint + path, json=json_data, params=params)
+                response = self.session.request(method, url, json=json_data, params=params, timeout=10)
                 status_code = response.status_code
 
                 if status_code == 200:
-                    return response.json()
-
+                    if self.log_response:
+                        print(response.text)
+                    jdata = response.json()
+                    if api_version in public_apis:
+                        if jdata['status'] == 'SUCCESS':
+                            if 'data' in jdata:
+                                return jdata['data']
+                            else:
+                                return True
+                        else:
+                            raise Exception(f'Bad request status: {jdata["status"]}')
+                    else:
+                        return jdata
                 elif status_code == 401 or status_code == 400:
-                    raise Exception('[*] Wrong Auth token')
-
+                    print(response.text)
+                    raise Exception(f'API TOKEN EXPIRED')
                 elif status_code == 429:
-                    raise Exception('[*] You are Rate Limited')
+                    raise Exception('You are Rate Limited')
+                else:
+                    raise Exception(f'REQ STATUS CODE: {status_code}')
 
             except Exception as e:
-                print(f'[!] Request error: {e}. Try attemp #{counter}')
-                time.sleep(delay)
+                print(f'[!] Request error: {e}. Try attempt #{counter}')
+                time.sleep(2)
 
-    def get_user_balance(self, currency='TON') -> dict:
-        return self.request('GET', f'/api/v1/accounts/{currency}/')
+        raise Exception('[!] Request attempts end')
 
-    def get_user_p2p_payment(self) -> dict:
-        return self.request('POST', '/p2p/public-api/v2/payment-details/get/by-user-id')
+    def get_earn_campings(self):
+        return self.request('earn/campaigns', 'v2api')
 
-    def get_user_p2p_order_history(self, offset=0, limit=200) -> dict:
-        json_data = {
-            "offset": offset,
-            "limit": limit
-        }
-        return self.request('POST', '/p2p/public-api/v2/offer/order/get-history/by-user-id', json_data)
+    def get_user_balances(self, currency: str = None) -> Balances | BalanceAccount:
+        """ Account balances
 
-    def get_own_p2p_offer(
-            self,
-            tag: str = None,
-            offer_id: int = None,
-            offer_type=None,
-            status: str = 'ACTIVE'
-    ) -> OwnOffer:
-        """
-        :param offer_type:  PURCHASE | SALE
-        :param offer_id:
-        :param tag: example 'AS-00057073'
-        :param status: None | ACTIVE | INACTIVE
-        :return: Offer
-        """
-        offers = self.get_own_p2p_offers(status=status)
-
-        if not offers:
-            return []
-
-        if tag is not None:
-            return [o for o in offers if o.number == tag][0]
-
-        elif offer_id is not None:
-            return [o for o in offers if o.id == offer_id][0]
-
-        elif offer_type is not None:
-            return [o for o in offers if o.type == offer_type][0]
-
-        else:
-            return offers[0]
-
-    def get_own_p2p_offers(self, order_type: str = None, status: str | None = None) -> list[OwnOffer]:
-        """
-        :param status: None | ACTIVE | INACTIVE
-        :param order_type: None | PURCHASE | SALE
+        :param currency: TON NOT BTC USDT
         :return:
         """
-        result = self.request('POST', '/p2p/public-api/v2/offer/user-own/list')
+        balances: Balances = Balances.from_dict(self.request(f'accounts/'))
+        if currency:
+            for a in balances.accounts:
+                if a.currency == currency:
+                    return a
+        else:
+            return balances
 
-        offers = [OwnOffer.from_dict(json_data) for json_data in result['data']]
+    def get_transactions(self, limit: int = 20, last_id: int = None, crypto_currency: str = None,
+                         transaction_type: str = None, transaction_gateway: str = None) -> TxResponse:
+        """ Account in withdraw | deposit txs
 
-        if order_type is not None:
-            offers = [offer for offer in offers if offer.type == order_type]
+        :param transaction_gateway: withdraw_onchain | tg_transfer | top_up | p2p_order | earn | internal
+        :param transaction_type: withdraw | deposit
+        :param crypto_currency: BTC USDT TON NOT
+        :param limit:
+        :param last_id:
+        :return:
+        """
+        params = {
+            limit: limit,
+            last_id: last_id,
+            crypto_currency: crypto_currency,
+            transaction_type: transaction_type,
+            transaction_gateway: transaction_gateway
+        }
+        return TxResponse.from_dict(self.request(f'transactions/', params=params))
 
-        if status is not None:
-            offers = [offer for offer in offers if offer.type == status]
+    def get_transaction_details(self, tx_id: int) -> TxDetails:
+        """ One tx info
 
-        return offers
-
-    def disable_p2p_bidding(self):
-        return self.request('POST', '/p2p/public-api/v2/user-settings/disable-bidding')
-
-    def enable_p2p_bidding(self):
-        return self.request('POST', '/p2p/public-api/v2/user-settings/enable-bidding')
-
-    def create_p2p_offer(
-            self,
-            currency: str,
-            amount: int,
-            fiat: str,
-            margine: int,
-            offer_type: str,
-            order_min_price: int,
-            pay_methods: list,
-            comment: str = None,
-            price_type: str = "FLOATING"
-    ):
+        :param tx_id:
+        :return:
         """
 
-        :param pay_methods:
+        return TxDetails.from_dict(self.request(f'transactions/details/{tx_id}/'))
+
+    def get_passcode_info(self) -> dict:
+        return self.request(f'passcode/info', api_version='v2api')
+
+    def get_recovery_email(self, product: str):
+        """
+
+        :param product: wallet | ton-space
+        :return:
+        """
+        params = {'product': product}
+        return self.request(f'recovery-email/', api_version='v2api', params=params)
+
+    def get_user_region_verification(self) -> dict:
+        return self.request('region-verification/status', api_version='users/public-api/v2')
+
+    def get_wallet(self, crypto_currency: str) -> list:
+        """ Get address your wallet to deposit
+
+        :param crypto_currency: TON
+        :return:
+        """
+        return self.request(f'users/get_or_create_wallets/{crypto_currency}')
+
+    def get_exchange_pair_info(self, from_currency: str, to_currency=str, from_amount: float = 1) -> dict:
+        """
+
+        :param from_currency: BTC USDT TON NOT
+        :param to_currency: BTC USDT TON NOT
+        :param from_amount:
+        :return:
+        """
+        data = {
+            "from_amount": from_amount,
+            "from_currency": from_currency,
+            "to_currency": to_currency
+        }
+        return self.request('exchange/convert/', method='POST', json_data=data)
+
+    def get_get_available_exchanges(self):
+        """
+            https://walletbot.me/api/v1/exchange/get-available-exchanges/
+            GET
+        """
+        raise Exception('Not realized')
+
+    # P2P Market
+
+    def get_own_p2p_user_info(self):
+        data = {'deviceId': hashlib.md5(uuid.UUID(int=uuid.getnode()).hex.encode('utf-8')).hexdigest()[:20]}
+        return self.request('user/get', api_version='users/public-api/v2', method='POST', json_data=data)
+
+    def get_user_p2p_payments(self) -> dict:
+        """ List own payment methods
+
+        :return:
+        """
+        return self.request('payment-details/get/by-user-id', api_version='p2p/public-api/v2', method='POST')
+
+    def get_supported_p2p_fiat(self):
+        """
+            https://walletbot.me/p2p/public-api/v2/currency/all-supported-fiat
+            POST
+        """
+        raise Exception('Not realized')
+
+    def get_offer_settings(self):
+        """
+            https://walletbot.me/p2p/public-api/v2/offer/settings/get
+            POST
+        """
+        raise Exception('Not realized')
+
+    def get_own_p2p_order_history(self, offset=0, limit=20, status: str = 'ALL_ACTIVE') -> list[Order]:
+        """
+
+        :param offset:
+        :param limit:
+        :param status: ALL_ACTIVE | ALL_COMPLETED
+        :return:
+        """
+        data = {
+            "offset": offset,
+            "limit": limit,
+            "filter": {
+                "status": status
+            }
+        }
+        orders_raw = self.request(
+            'offer/order/get-history/by-user-id',
+            method='POST',
+            api_version='p2p/public-api/v2',
+            json_data=data)
+
+        return [Order.from_dict(o) for o in orders_raw]
+
+    def get_p2p_order(self, order_id: int):
+        """ Order - its active or completed offer
+
+        :param order_id:
+        :return:
+        """
+        data = {'orderId': order_id}
+        return Order.from_dict(
+            self.request('offer/order/get', api_version='p2p/public-api/v2', method='POST', json_data=data))
+
+    def get_p2p_rate(self, base='TON', quote='RUB') -> dict:
+        params = {'base': base, 'quote': quote}
+        return self.request(f'rate/crypto-to-fiat', api_version='rates/public-api/v1', params=params)
+
+    def get_p2p_price_limits(self):
+        """
+        https://walletbot.me/p2p/public-api/v2/offer/limits/fixed-price/get
+        POST
+        {
+            "baseCurrencyCode": "TON",
+            "quoteCurrencyCode": "RUB"
+        }
+
+        :return:
+        """
+        raise Exception('Not realized')
+
+    def get_p2p_payment_methods_by_currency(self, currency='RUB') -> dict:
+        data = {"currencyCode": currency}
+        return self.request(
+            'payment-details/get-methods/by-currency-code',
+            api_version='p2p/public-api/v2',
+            method='POST',
+            json_data=data)
+
+    def create_p2p_offer(self, currency: str, amount: float, fiat: str, margine: int, offer_type: str,
+                         order_min_price: int, pay_methods: list, comment: str = None, price_type: str = "FLOATING",
+                         confirm_timeout_tag: str = "PT15M") -> Offer:
+        """
+
+        :param pay_methods: list of payment methods ids or list of payment methods codes
+            if SALE - get_user_p2p_payments()
+            if PURCHASE - get_p2p_payment_methods_by_currency()
+
+        :param confirm_timeout_tag: PT15M PT5M PT10M
         :param comment:
         :param order_min_price:
-        :param margine:
+        :param margine: 90 - 120
         :param fiat: RUB | KZT etc...
         :param price_type: FLOATING | FIXED
         :param amount:
@@ -136,173 +282,143 @@ class Wallet:
         :return:
         """
 
+        data = {
+            "type": offer_type,
+            "initVolume": {
+                "currencyCode": currency,
+                "amount": str(amount)
+            },
+            "price": {
+                "type": price_type,
+                "baseCurrencyCode": currency,
+                "quoteCurrencyCode": fiat,
+                "value": margine
+            },
+            "orderAmountLimits": {
+                "min": order_min_price
+            },
+            "paymentConfirmTimeout": confirm_timeout_tag,
+            "comment": comment,
+        }
+
         if offer_type == 'PURCHASE':
-            json_data = {
-                "type": offer_type,
-                "initVolume": {
-                    "currencyCode": currency,
-                    "amount": str(amount)
-                },
-                "price": {
-                    "type": price_type,
-                    "baseCurrencyCode": currency,
-                    "quoteCurrencyCode": fiat,
-                    "value": margine
-                },
-                "orderAmountLimits": {
-                    "min": order_min_price
-                },
-                "paymentConfirmTimeout": "PT15M",
-                "comment": comment,
-                "paymentMethodCodes": pay_methods
-            }
+            data['paymentMethodCodes'] = pay_methods
         else:
-            json_data = {
-                "type": offer_type,
-                "initVolume": {
-                    "currencyCode": currency,
-                    "amount": str(amount)
-                },
-                "price": {
-                    "type": price_type,
-                    "baseCurrencyCode": currency,
-                    "quoteCurrencyCode": fiat,
-                    "value": margine
-                },
-                "orderAmountLimits": {
-                    "min": order_min_price
-                },
-                "paymentConfirmTimeout": "PT15M",
-                "comment": comment,
-                "paymentDetailsIds": pay_methods
-            }
+            data['paymentDetailsIds'] = pay_methods
 
-        return self.request('POST', '/p2p/public-api/v2/offer/create', json_data)
+        return Offer.from_dict(
+            self.request('offer/create', api_version='p2p/public-api/v2', method='POST', json_data=data))
 
-    def clone_p2p_offer(self, offer_id, amount=None):
-        o = self.get_own_p2p_offer_by_id(offer_id)
+    def activate_p2p_offer(self, offer_id, offer_type):
+        data = {"type": offer_type, "offerId": offer_id}
+        return self.request('offer/activate', api_version='p2p/public-api/v2', method='POST', json_data=data)
 
-        if amount is None:
-            amount = o['data']['availableVolume']['amount']
-        else:
-            amount = round(amount, 9)
+    def deactivate_p2p_offer(self, offer_id, offer_type):
+        data = {
+            "type": offer_type,
+            "offerId": offer_id
+        }
+        return self.request('offer/deactivate', api_version='p2p/public-api/v2', method='POST', json_data=data)
 
-        if o['data']['type'] == 'SALE':
-            pd = [p['id'] for p in o['data']['paymentDetails']]
-        else:
-            pd = [m['code'] for m in o['data']['paymentMethods']]
+    def disable_p2p_bidding(self):
+        return self.request('user-settings/disable-bidding', api_version='p2p/public-api/v2', method='POST')
 
-        return self.create_p2p_offer(
-            currency=o['data']['price']['baseCurrencyCode'],
-            amount=amount,
-            fiat=o['data']['price']['quoteCurrencyCode'],
-            margine=o['data']['price']['value'],
-            offer_type=o['data']['type'],
-            order_min_price=o['data']['orderAmountLimits']['min'],
-            pay_methods=pd,
-            comment=o['data']['comment'],
-            price_type=o['data']['price']['type']
-        )
+    def enable_p2p_bidding(self):
+        return self.request('user-settings/enable-bidding', api_version='p2p/public-api/v2', method='POST')
 
-    def replace_p2p_offer(self, offer_id, order_type, amount=None):
-        new_offer = self.clone_p2p_offer(offer_id, amount)
-        self.p2p_offer_deactivate(offer_id, order_type)
-        self.p2p_offer_activate(offer_id=new_offer['data']['id'], offer_type=new_offer['data']['type'])
-        return new_offer
+    def get_own_p2p_offers(self, offset: int = 0, limit: int = 10,
+                           offer_type: str = 'PURCHASE', status: str | None = None) -> list[Offer]:
+        """
+        :param offset:
+        :param limit: None | PURCHASE | SALE
+        :param offer_type:
+        :param status: None | ACTIVE | INACTIVE
+        :return:
+        """
+        data = {
+            "offset": offset,
+            "limit": limit,
+            "offerType": offer_type
+        }
+        raw_offers = self.request(
+            'offer/user-own/list', api_version='p2p/public-api/v2', method='POST', json_data=data)
 
-    def edit_p2p_offer(
-            self,
-            offer_id: int,
-            value: float,
-            order_amount_min: float = None,
-    ):
+        offers = [Offer.from_dict(o) for o in raw_offers]
+
+        if status is not None:
+            offers = [Offer.from_dict(o) for o in raw_offers if o['status'] == status]
+
+        return offers
+
+    def get_own_p2p_offer(self, offer_id: int) -> Offer:
+        json_data = {"offerId": offer_id}
+        return Offer.from_dict(self.request(
+            'offer/get-user-own', api_version='p2p/public-api/v2', method='POST', json_data=json_data))
+
+    def get_p2p_offer(self, offer_id: int) -> Offer:
+        data = {"offerId": offer_id}
+        return Offer.from_dict(
+            self.request('offer/get', api_version='p2p/public-api/v2', method='POST', json_data=data))
+
+    def edit_p2p_offer(self, offer_id: int, margine: int = None, volume: float = None,
+                       order_amount_min: float = None, comment: str = None):
         """
 
+        :param margine:
+        :param comment:
         :param order_amount_min:
-        :param value:
+        :param volume:
         :param offer_id:
         :return:
         """
+        offer = self.get_p2p_offer(offer_id)
 
-        od = self.get_own_p2p_offer_by_id(offer_id)['data']
-
-        if order_amount_min is None:
-            order_amount_min = float(od['orderAmountLimits']['min'])
-
-        if od['type'] == 'PURCHASE':
-            json_data = {
-                "offerId": offer_id,
-                "paymentConfirmTimeout": "PT15M",
-                "type": od['type'],
-                "price": {
-                    "type": od['price']['type'],
-                    "value": str(round(value, 4))
-                },
-                "orderAmountLimits": {
-                    "min": str(round(order_amount_min, 2))
-                },
-                "comment": od['comment'],
-                "paymentMethodCodes": [
-                    p['code'] for p in od['paymentMethods']
-                ]
-            }
-        else:
-
-            json_data = {
-                "offerId": offer_id,
-                "paymentConfirmTimeout": "PT15M",
-                "type": od['type'],
-                "price": {
-                    "type": od['price']['type'],
-                    "value": str(round(value, 2))
-                },
-                "orderAmountLimits": {
-                    "min": str(round(order_amount_min, 2))
-                },
-                "comment": od['comment'],
-                "paymentDetailsIds": [p['id'] for p in od['paymentDetails']]
-            }
-
-        return self.request('POST', '/p2p/public-api/v2/offer/edit', json_data)
-
-    def get_own_p2p_offer_by_id(self, offer_id: int):
-        json_data = {
-            "offerId": offer_id
+        data = {
+            "offerId": offer_id,
+            "paymentConfirmTimeout": offer.paymentConfirmTimeout,
+            "type": offer.type,
+            "price": {
+                "type": offer.price.type,
+                "value": offer.price.value
+            },
+            "orderAmountLimits": {
+                "min": offer.orderAmountLimits.min
+            },
+            "comment": offer.comment,
+            "volume": 5,
         }
-        return self.request('POST', '/p2p/public-api/v2/offer/get-user-own', json_data)
 
-    def p2p_offer_activate(self, offer_id, offer_type):
-        json_data = {
-            "type": offer_type,
-            "offerId": offer_id
+        if margine:
+            data['price']['value'] = margine
+
+        if volume:
+            data['volume'] = volume
+
+        if order_amount_min:
+            data['orderAmountLimits']['min'] = order_amount_min
+
+        if comment:
+            data['comment'] = comment
+
+        return Offer.from_dict(
+            self.request('offer/edit', api_version='p2p/public-api/v2', method='POST', json_data=data))
+
+    def accept_p2p_order(self, order_id: int, offer_type: str) -> Order:
+        """
+
+        :param order_id:
+        :param offer_type: SALE | PURCHASE
+        :return:
+        """
+        data = {
+            'orderId': order_id,
+            'type': offer_type,
         }
-        return self.request('POST', '/p2p/public-api/v2/offer/activate', json_data)
+        return Order.from_dict(
+            self.request('offer/order/accept', api_version='p2p/public-api/v2', method='POST', json_data=data))
 
-    def p2p_offer_deactivate(self, offer_id, offer_type):
-        json_data = {
-            "type": offer_type,
-            "offerId": offer_id
-        }
-        return self.request('POST', '/p2p/public-api/v2/offer/deactivate', json_data)
-
-    def get_p2p_payment_methods_by_currency(self, currency='RUB') -> dict:
-        json_data = {
-            "currencyCode": currency
-        }
-        return self.request('POST', '/p2p/public-api/v2/payment-details/get-methods/by-currency-code', json_data)
-
-    def get_rate(self, base='TON', quote='RUB') -> float:
-        result = self.request('GET', f'/rates/public-api/v1/rate/crypto-to-fiat?base={base}&quote={quote}')
-        return float(result['data']['rate'])
-
-    def get_p2p_market(
-            self,
-            base_currency_code,
-            quote_currency_code,
-            offer_type='SALE',
-            offset=0, limit=100,
-            desired_amount=None
-    ) -> list[Offer]:
+    def get_p2p_market(self, base_currency_code: str, quote_currency_code: str, offer_type='SALE', offset=0, limit=100,
+                       desired_amount=None) -> list[MarketOffer]:
         """
 
         :param desired_amount:
@@ -313,7 +429,7 @@ class Wallet:
         :param limit:
         :return:
         """
-        json_data = {
+        data = {
             "baseCurrencyCode": base_currency_code,
             "quoteCurrencyCode": quote_currency_code,
             "offerType": offer_type,
@@ -321,51 +437,9 @@ class Wallet:
             "limit": limit,
             "desiredAmount": desired_amount
         }
-        market = self.request('POST', '/p2p/public-api/v2/offer/depth-of-market', json_data)
-        return [Offer.from_dict(json_data) for json_data in market['data']]
-
-    def get_p2p_offer(self, offer_id: int):
-        json_data = {
-            "offerId": offer_id
-        }
-        return self.request('POST', '/p2p/public-api/v2/offer/get', json_data)
-
-    def update_p2p_offer_value(self, offer_id, add_amount=None):
-        o = self.get_own_p2p_offer(offer_id=offer_id)
-
-        if o.type == 'SALE':
-            self.p2p_offer_deactivate(o.id, o.type)
-            amount = self.get_user_balance('TON')['available_balance']
-        else:
-            amount = o.availableVolume.amount + add_amount + add_amount * 0.9 / 100
-
-        r = self.replace_p2p_offer(o.id, o.type, amount)
-        return OwnOffer.from_dict(r['data'])
-
-    def get_transactions(self, limit=10, last_id=None) -> dict:
-
-        if last_id is not None:
-            return self.request('GET', f'/api/v1/transactions/?limit={limit}&last_id={last_id}')
-        else:
-            return self.request('GET', f'/api/v1/transactions/?limit={limit}')
-
-    def get_transaction_details(self, tx_id) -> dict:
-        return self.request('GET', f'/api/v1/transactions/details/{tx_id}/')
-
-    # not realized
-    # def send_to_user(self, amount, currency, receiver_tg_id):
-    #     v = self.withdrawals_validate_amount(amount, currency, receiver_tg_id)
-    #
-    #     if v['status'] == 'ok':
-    #
-    #         json_data = {
-    #             'amount': amount,
-    #             'currency': currency
-    #         }
-    #         return self.request('POST', f'/api/v1/transfers/create_transfer_request/', json_data=json_data)
-    #
-    #     else:
-    #         raise Exception(f'[!] Error withdrawals_validate_amount: {v}')
+        market = self.request(
+            'offer/depth-of-market', api_version='p2p/public-api/v2', method='POST', json_data=data)
+        return [MarketOffer.from_dict(offer) for offer in market]
 
     def send_to_address(self, amount, currency, address):
         """
@@ -383,22 +457,17 @@ class Wallet:
             raise Exception(f'[!] Bad validate status: {validate}')
 
     def _process_withdraw_request(self, uid):
-        return self.request('POST', f'/api/v1/withdrawals/process_withdraw_request/{uid}/')
+        return self.request(f'withdrawals/process_withdraw_request/{uid}/', method='POST')
 
-    def withdrawals_validate_amount(
-            self,
-            amount: float,
-            currency: str,
-            receiver_tg_id: int = None,
-            address: str = None
-    ):
+    def withdrawals_validate_amount(self, amount: float, currency: str, receiver_tg_id: int = None,
+                                    address: str = None):
         params = {
             'amount': amount,
             'currency': currency,
             'receiver_tg_id': receiver_tg_id,
             'address': address
         }
-        return self.request('GET', f'/api/v1/withdrawals/validate_amount/', params=params)
+        return self.request(f'withdrawals/validate_amount/', params=params)
 
     def _create_withdraw_request(self, amount: float, currency: str, address: str):
         params = {
@@ -407,7 +476,23 @@ class Wallet:
             'max_value': 'false',
             'address': address,
         }
-        return self.request('POST', '/api/v1/withdrawals/create_withdraw_request/', params=params)
+        return self.request('withdrawals/create_withdraw_request/', method='POST', params=params)
 
     def process_transfer(self, tx_id: str):
-        return self.request('POST', f'/api/v1/transfers/process_transfer/{tx_id}/')
+        return self.request(f'transfers/process_transfer/{tx_id}/', method='POST')
+
+    def send_to_user(self, amount, currency, receiver_tg_id):
+        v = self.withdrawals_validate_amount(amount, currency, receiver_tg_id)
+
+        if v['status'] == 'OK':
+            data = {
+                'amount': amount,
+                'currency': currency
+            }
+            tx = self.request(
+                f'transfers/create_transfer_request/', method='POST', json_data=data)['transfer_request_id']
+
+            return self.process_transfer(tx)
+
+        else:
+            raise Exception(f'[!] Error withdrawals_validate_amount: {v}')

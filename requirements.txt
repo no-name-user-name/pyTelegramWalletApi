@@ -4,3 +4,5 @@ pytest
 selenium~=4.13.0
 openpyxl~=3.1.2
 setuptools~=68.1.2
+blinker==1.7.0
+dataclasses-json
