@@ -2,9 +2,8 @@ import time
 
 import openpyxl
 
-from wallet.rest import Wallet
+from wallet import Wallet, Client
 from wallet.types import Order
-# from wallet.web_client import Client
 
 # web_client = Client(profile='main')
 # auth_token = web_client.get_token()

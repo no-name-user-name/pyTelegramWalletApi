@@ -38,68 +38,177 @@ Working with the API is implemented using "requests"
 pip install pyTelegramWalletApi
 ```
 
-### Example
+### Send by address
 
 ```python
-import time
+from wallet import Wallet, Client
 
-from wallet import Client, Wallet
-
-# singin/singup to tg account
-c = Client(profile='main')
-
-# get wallet auth token
+# use chromedriver to loging tg and parse auth_token
+c = Client(profile='main', headless=True)
 auth_token = c.get_token()
 
 w = Wallet(auth_token)
+balance = w.get_user_balances('USDT')
+print(f'[*] Balance: {balance.available_balance} TON')
 
-ton_balance = w.get_user_balance('TON')['available_balance']
-print(f'[*] Balance: {ton_balance} TON')
-
-tx_id = w.send_to_address(0.01, 'TON', 'EQA5IHeHWX9BkTsI71ECzuD-HeYL-br36UmFoTWZFihU3fLz')['transaction_id']
-
-tx_link = None
-status = ''
-
-# wait tx in block
-while tx_link is None:
-    details = w.get_transaction_details(tx_id)
-    tx_link = details["transaction_link"]
-    status = details['status']
-    time.sleep(2)
-
-print(f'[*] Tx status: {status} | {tx_link}')
-
-""" Logs
-[*] Starting parse wallet authorization token...
-[*] Token find: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpX....
-[*] Balance: 100 TON
-[*] Tx status: success | https://tonscan.org/tx/....
-"""
+w.send_to_address(balance.available_balance, 'USDT', 'UQC_tRAxYGgMuU4sSqN6eRWArwvL4qI3gXn_', network='ton')
 ```
 
+### Send by username
+```python
+from wallet import Client, Wallet
 
-## Realised methods
+c = Client(profile='main', headless=True)
 
-Wallet Account Methods:
-- send_to_address()
-- get_user_balance()
-- get_transaction_details()
-- get_transactions()
-- get_rate()
+# To send coins within a telegram, you need to receive an “auth_token”
+# from Wallet directly in chat with the recipient
+
+auth_token = c.get_token(username='username_to_recieve')
+print(c.receiver_id)  # browser parse tg_id by username
+
+w = Wallet(auth_token, log_response=True)
+w.send_to_user(amount=1, currency='USDT', receiver_tg_id=c.receiver_id)
+```
+
+### Parse P2P market
+
+```python
+import time
+from wallet import Wallet
+
+w = Wallet.token_from_file('token.txt')  # load token from file method
+
+while True:
+    try:
+        o = w.get_p2p_market('TON', 'RUB', 'SALE', desired_amount=5000)[0]
+
+        print(f'Top offer ID: {o.id}\n'
+              f'Price: {o.price.value} {o.price.quoteCurrencyCode}\n'
+              f'Volume: {o.availableVolume} TON\n'
+              f'User: {o.user.nickname} | Orders: {o.user.statistics.totalOrdersCount}\n'
+              f'=============================')
+        """
+        Top offer ID: 187885
+        Price: 590.0 RUB
+        Volume: 30.682475494 TON
+        User: Lucky Goose | Orders: 3127
+        =============================
+        """
+        
+    except Exception as e:
+        print(f"[!] Error: {e}")
+
+    time.sleep(5)
+
+```
+
+### Create own offers
+
+```python
+from wallet import Wallet
+
+w = Wallet.token_from_file('token.txt')  # load token from file method
+ 
+new_offer = w.create_p2p_offer(
+    comment='Hello',
+    currency='TON',
+    fiat='RUB',
+    amount=10,
+    margine=90,
+    offer_type='PURCHASE',
+    order_min_price=500,
+    pay_methods=['tinkoff'],
+)
+
+w.activate_p2p_offer(new_offer.id, new_offer.type)
+```
+
+## Wallet realised methods
+
+### Account methods
+
+```
+get_user_balances(currency)
+```
+```
+get_transactions(limit, last_id, crypto_currency, transaction_type, transaction_gateway)
+```
+```
+get_wallet(crypto_currency)
+```
+```
+get_exchange_pair_info(from_currency, to_currency, from_amount)
+```
+```
+get_earn_campings()
+```
+```
+test_get_transaction_details(tx_id)
+```
+```
+get_user_region_verification()
+```
+```
+send_to_address(amount, currency, address, network)
+```
+```
+send_to_user(amount, currency, receiver_tg_id)
+```
+
+### P2P matket methods
 
 
-Wallet P2P Methods:
-- get_p2p_market()
-- create_p2p_offer()
-- edit_p2p_offer()
-- get_p2p_offer()
-- get_own_p2p_offer_by_id()
-- get_user_p2p_payment()
-- get_user_p2p_order_history()
-- get_own_p2p_offer()
-- get_own_p2p_offers()
-- enable_p2p_bidding()
-- disable_p2p_bidding()
-- p2p_offer_activate()
-- p2p_offer_deactivate()
+```
+get_own_p2p_user_info()
+```
+```
+get_user_p2p_payments()
+```
+```
+get_own_p2p_order_history(offset, limit, status)
+```
+```
+get_p2p_order(order_id)
+```
+```
+get_p2p_rate(base, quote)
+```
+```
+get_p2p_payment_methods_by_currency(currency)
+```
+```
+create_p2p_offer(currency, amount, fiat, margine, offer_type,
+                 order_min_price, pay_methods, comment, price_type,
+                 confirm_timeout_tag:)
+```
+```
+edit_p2p_offer(currency, offer_id, margine, volume, order_amount_min, comment)
+```
+```
+activate_p2p_offer(offer_id, offer_type)
+```
+```
+deactivate_p2p_offer(offer_id, offer_type)
+```
+```
+enable_p2p_bidding()
+```
+```
+disable_p2p_bidding()
+```
+```
+get_own_p2p_offers(offset limit, offer_type, status)
+```
+```
+get_p2p_offer(offer_id)
+```
+```
+get_own_p2p_offer(offer_id)
+```
+```
+accept_p2p_order(order_id, offer_type)
+```
+```
+get_p2p_market(base_currency_code, quote_currency_code, offer_type, offset, limit,desired_amount)
+```
+

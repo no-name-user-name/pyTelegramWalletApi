@@ -27,8 +27,8 @@ if __name__ == '__main__':
                     else:
                         verif = ''
 
-                    print(f'[*] Order accept! '
-                          f'    Seller: {o.seller.nickname}{verif} | ID: {o.seller.userId}'
+                    print(f'[*] Order accept! \n'
+                          f'    Seller: {o.seller.nickname}{verif} | ID: {o.seller.userId}\n'
                           f"    Stats: {s_orders} orders | Success {s_rate}%")
 
                     print('[*] Payment Details:')

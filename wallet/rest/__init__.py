@@ -169,7 +169,7 @@ class Wallet:
         }
         return self.request('exchange/convert/', method='POST', json_data=data)
 
-    def get_get_available_exchanges(self):
+    def get_available_exchanges(self):
         """
             https://walletbot.me/api/v1/exchange/get-available-exchanges/
             GET
@@ -441,17 +441,22 @@ class Wallet:
             'offer/depth-of-market', api_version='p2p/public-api/v2', method='POST', json_data=data)
         return [MarketOffer.from_dict(offer) for offer in market]
 
-    def send_to_address(self, amount, currency, address):
+    def send_to_address(self, amount, currency, address, network=None):
         """
 
+        :param network: for USDT - ton | tron
         :param amount:
         :param currency:
         :param address:
         :return: dict {'transaction_id': 000000}
         """
-        validate = self.withdrawals_validate_amount(amount, currency, address=address)
+
+        if currency == 'USDT' and not network:
+            raise Exception('NETWORK NOT SET | For USDT set network="ton" or network="tron"')
+
+        validate = self.withdrawals_validate_amount(amount, currency, address=address, network=network)
         if validate['status'] == 'OK':
-            withdraw_request = self._create_withdraw_request(amount, currency, address)
+            withdraw_request = self._create_withdraw_request(amount, currency, address, network)
             return self._process_withdraw_request(withdraw_request['uid'])
         else:
             raise Exception(f'[!] Bad validate status: {validate}')
@@ -460,21 +465,23 @@ class Wallet:
         return self.request(f'withdrawals/process_withdraw_request/{uid}/', method='POST')
 
     def withdrawals_validate_amount(self, amount: float, currency: str, receiver_tg_id: int = None,
-                                    address: str = None):
+                                    address: str = None, network: str=None):
         params = {
             'amount': amount,
             'currency': currency,
             'receiver_tg_id': receiver_tg_id,
-            'address': address
+            'address': address,
+            'network': network.lower()
         }
         return self.request(f'withdrawals/validate_amount/', params=params)
 
-    def _create_withdraw_request(self, amount: float, currency: str, address: str):
+    def _create_withdraw_request(self, amount: float, currency: str, address: str, network:str):
         params = {
             'amount': str(amount),
             'currency': currency,
             'max_value': 'false',
             'address': address,
+            "network": network
         }
         return self.request('withdrawals/create_withdraw_request/', method='POST', params=params)
 
