@@ -44,13 +44,27 @@ class Client:
     @classmethod
     def auth(cls, profile, temp_dir_path=None):
         c = Client(headless=False, profile=profile, temp_dir_path=temp_dir_path)
+        start_page = "https://web.telegram.org/a/#1985737506"
+        c.driver.get(start_page)
         print("Connect Telegram Account")
 
-        while True:
-            if c.driver.current_url == 'https://web.telegram.org/k/#1985737506':
-                return c
-            else:
-                time.sleep(1)
+        try:
+            WebDriverWait(c.driver, 5).until(
+                EC.presence_of_element_located((By.ID, 'auth-qr-form'))
+            )
+            print('Auth by QR')
+
+            while True:
+                if c.driver.current_url == start_page:
+                    return c
+                else:
+                    time.sleep(1)
+
+        except Exception as e:
+            pass
+
+
+
 
     def _parse_token(self, wallet_endpoint):
         try:
