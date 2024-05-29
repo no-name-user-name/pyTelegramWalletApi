@@ -63,9 +63,6 @@ class Client:
         except Exception as e:
             pass
 
-
-
-
     def _parse_token(self, wallet_endpoint):
         try:
             iframe = WebDriverWait(self.driver, 10).until(

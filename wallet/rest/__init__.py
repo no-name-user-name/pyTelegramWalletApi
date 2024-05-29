@@ -103,7 +103,7 @@ class Wallet:
             return balances
 
     def get_transactions(self, limit: int = 20, last_id: int = None, crypto_currency: str = None,
-                         transaction_type: str = None, transaction_gateway: str = None) -> TxResponse:
+                         transaction_type: str = None, transaction_gateway: str = None) -> list[TxDetails]:
         """ Account in withdraw | deposit txs
 
         :param transaction_gateway: withdraw_onchain | tg_transfer | top_up | p2p_order | earn | internal
@@ -114,13 +114,13 @@ class Wallet:
         :return:
         """
         params = {
-            limit: limit,
-            last_id: last_id,
-            crypto_currency: crypto_currency,
-            transaction_type: transaction_type,
-            transaction_gateway: transaction_gateway
+            'limit': limit,
+            'last_id': last_id,
+            'crypto_currency': crypto_currency,
+            'transaction_type': transaction_type,
+            'transaction_gateway': transaction_gateway
         }
-        return TxResponse.from_dict(self.request(f'transactions/', params=params))
+        return TxResponse.from_dict(self.request(f'transactions/', params=params)).transactions
 
     def get_transaction_details(self, tx_id: int) -> TxDetails:
         """ One tx info
