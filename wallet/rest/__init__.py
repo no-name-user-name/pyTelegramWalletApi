@@ -465,17 +465,17 @@ class Wallet:
         return self.request(f'withdrawals/process_withdraw_request/{uid}/', method='POST')
 
     def withdrawals_validate_amount(self, amount: float, currency: str, receiver_tg_id: int = None,
-                                    address: str = None, network: str=None):
+                                    address: str = None, network: str = None):
         params = {
             'amount': amount,
             'currency': currency,
             'receiver_tg_id': receiver_tg_id,
             'address': address,
-            'network': network.lower()
+            'network': network.lower() if network else None
         }
         return self.request(f'withdrawals/validate_amount/', params=params)
 
-    def _create_withdraw_request(self, amount: float, currency: str, address: str, network:str):
+    def _create_withdraw_request(self, amount: float, currency: str, address: str, network: str):
         params = {
             'amount': str(amount),
             'currency': currency,

@@ -69,7 +69,7 @@ class Client:
                 EC.presence_of_element_located((By.TAG_NAME, 'iframe'))
             )
         except Exception as e:
-            raise Exception('Iframe not find! Try start client with attr "headless"=True to recognize problem')
+            raise Exception('Iframe not find! Try start client with attr "headless"=False to recognize problem')
 
         self.driver.switch_to.frame(iframe)
 
