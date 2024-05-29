@@ -16,7 +16,7 @@ def test_get_user_balance():
 
 def test_get_transactions():
     txs = w.get_transactions()
-    assert isinstance(txs.size, int)
+    assert len(txs) > 0
 
 
 def test_get_transaction_details():
