@@ -39,3 +39,8 @@ def test_get_wallet():
 
 def test_exchange_pair_info():
     assert 'rate' in w.get_exchange_pair_info('TON', 'USDT')
+
+
+def test_exchange():
+    uid = w.create_exchange('USDT', 'TON', 1, 'RUB')['uid']
+    assert 'transaction_id' in w.submit_exchange(uid)

@@ -169,6 +169,43 @@ class Wallet:
         }
         return self.request('exchange/convert/', method='POST', json_data=data)
 
+    def create_exchange(self, from_currency: str, to_currency: str, from_amount: float, local_currency: str):
+        """
+        Create Swap simulate in Wallet. To complete swap -> submit_exchange( uid )
+
+        :param local_currency: "RUB" ...1
+        :param from_currency: "USDT" "TON"...
+        :param to_currency: "USDT" "TON"...
+        :param from_amount:
+        :return: {
+            "uid": "................",
+            "ttl": 30,
+            "from_amount": 1,
+            "from_balance_after": 1.240279,
+            "from_currency": "USDT",
+            "to_amount": 0.122889771,
+            "to_balance_after": 0.130665475,
+            "to_currency": "TON",
+            "from_fiat_amount": 88.78,
+            "from_fiat_currency": "RUB",
+            "to_fiat_amount": 87.52,
+            "to_fiat_currency": "RUB",
+            "rate": 0.122889771,
+            "fee_amount": 0,
+            "fee_currency": "USDT"
+        }
+        """
+        data = {
+            "from_amount": from_amount,
+            "from_currency": from_currency,
+            "to_currency": to_currency,
+            "local_currency": local_currency
+        }
+        return self.request('exchange/create_exchange/', method='POST', json_data=data)
+
+    def submit_exchange(self, uid):
+        return self.request(f'exchange/submit_exchange/{uid}/', method='POST')
+
     def get_available_exchanges(self):
         """
             https://walletbot.me/api/v1/exchange/get-available-exchanges/
