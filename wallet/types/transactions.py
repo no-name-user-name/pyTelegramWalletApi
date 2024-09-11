@@ -69,6 +69,8 @@ class TxDetails:
     amount: int | None = None
     activated_amount: int | None = None
     currency: str | None = None
+    block_reason: str | None = None
+    cryptocurrency_exchange: str | None = None
     unknown_things: CatchAll = None
 
     @staticmethod

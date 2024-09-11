@@ -95,6 +95,13 @@ class User:
 
 @dataclass_json(undefined=Undefined.INCLUDE)
 @dataclass
+class UserID:
+    userId: int
+    unknown_things: CatchAll = None
+
+
+@dataclass_json(undefined=Undefined.INCLUDE)
+@dataclass
 class Volume:
     currencyCode: str
     amount: float
@@ -126,6 +133,13 @@ class PaymentDetails:
     currency: str
     attributes: Attributes
     name: str
+    unknown_things: CatchAll = None
+
+
+@dataclass_json(undefined=Undefined.INCLUDE)
+@dataclass
+class PaymentDetailsHistory:
+    paymentMethod: PaymentMethod
     unknown_things: CatchAll = None
 
 
@@ -219,6 +233,29 @@ class Order:
     statusUpdateDateTime: str | None
     cancelReason: str | None = None
     acceptDateTime: str | None = None
+    unknown_things: CatchAll = None
+
+    @staticmethod
+    def to_dict():
+        pass
+
+    @staticmethod
+    def from_dict(data):
+        pass
+
+
+@dataclass_json(undefined=Undefined.INCLUDE)
+@dataclass
+class OrderHistory:
+    amount: Volume
+    buyer: UserID
+    id: int
+    number: str
+    paymentDetails: PaymentDetailsHistory
+    seller: UserID
+    status: str
+    statusUpdateDateTime: str | None
+    volume: Volume
     unknown_things: CatchAll = None
 
     @staticmethod

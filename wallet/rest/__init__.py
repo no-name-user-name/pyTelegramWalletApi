@@ -5,6 +5,7 @@ import uuid
 import requests
 
 from wallet.types import Offer, Balances, BalanceAccount, TxResponse, TxDetails, Order, MarketOffer
+from wallet.types.offers import OrderHistory
 
 
 class Wallet:
@@ -17,7 +18,8 @@ class Wallet:
             'content-type': 'application/json',
         }
 
-        self.endpoint = 'https://walletbot.me'
+        self.endpoint = "https://walletbot.me"
+        self.endpoint_p2p = "https://p2p.walletbot.me"
 
         if auth_token == '' or len(auth_token) < 30:
             raise Exception('[!] Bad auth token!')
@@ -45,10 +47,14 @@ class Wallet:
 
         if api_version in public_apis or api_version == 'v2api':
             self.session.headers['authorization'] = 'Bearer ' + self.auth_token
+
+            if api_version == 'p2p/public-api/v2':
+                url = f"{self.endpoint_p2p}/{api_version}/{path}"
+            else:
+                url = f"{self.endpoint}/{api_version}/{path}"
         else:
             self.session.headers['authorization'] = self.auth_token
-
-        url = f"{self.endpoint}/{api_version}/{path}"
+            url = f"{self.endpoint}/{api_version}/{path}"
 
         counter = 0
         while counter < max_attempts:
@@ -72,8 +78,7 @@ class Wallet:
                     else:
                         return jdata
                 elif status_code == 401 or status_code == 400:
-                    print(response.text)
-                    raise Exception(f'API TOKEN EXPIRED')
+                    raise Exception(f'API ERROR - {response.text}')
                 elif status_code == 429:
                     raise Exception('You are Rate Limited')
                 else:
@@ -245,23 +250,24 @@ class Wallet:
 
         :param offset:
         :param limit:
-        :param status: ALL_ACTIVE | ALL_COMPLETED
+        :param status: ALL_ACTIVE | COMPLETED_FOR_REQUESTER | CANCELLED_OR_CANCELLING
         :return:
         """
         data = {
-            "offset": offset,
-            "limit": limit,
-            "filter": {
-                "status": status
-            }
+            'offset': offset,
+            'limit': limit,
+            'filter': {
+                'status': status,
+            },
         }
+
         orders_raw = self.request(
-            'offer/order/get-history/by-user-id',
+            "offer/order/history/get-by-user-id",
             method='POST',
             api_version='p2p/public-api/v2',
             json_data=data)
 
-        return [Order.from_dict(o) for o in orders_raw]
+        return [OrderHistory.from_dict(o) for o in orders_raw]
 
     def get_p2p_order(self, order_id: int):
         """ Order - its active or completed offer
@@ -455,9 +461,10 @@ class Wallet:
             self.request('offer/order/accept', api_version='p2p/public-api/v2', method='POST', json_data=data))
 
     def get_p2p_market(self, base_currency_code: str, quote_currency_code: str, offer_type='SALE', offset=0, limit=100,
-                       desired_amount=None) -> list[MarketOffer]:
+                       desired_amount=None, payment_method_codes: list = None) -> list[MarketOffer]:
         """
 
+        :param payment_method_codes: ["sbp", "sberbankru"] - use get_p2p_payment_methods_by_currency() to get needed method code
         :param desired_amount:
         :param base_currency_code: TON | BTC
         :param quote_currency_code: RUB | KZT etc.
@@ -472,7 +479,8 @@ class Wallet:
             "offerType": offer_type,
             "offset": offset,
             "limit": limit,
-            "desiredAmount": desired_amount
+            "desiredAmount": desired_amount,
+            "paymentMethodCodes": payment_method_codes
         }
         market = self.request(
             'offer/depth-of-market', api_version='p2p/public-api/v2', method='POST', json_data=data)

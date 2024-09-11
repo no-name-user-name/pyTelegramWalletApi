@@ -21,6 +21,7 @@ class BalanceAccount:
     available_balance_fiat_currency: str
     has_transactions: bool
     addresses: list[AccountAddress]
+    rate: float
     unknown_things: CatchAll = None
 
 
