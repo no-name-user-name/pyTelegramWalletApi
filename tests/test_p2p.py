@@ -13,13 +13,13 @@ def test_get_user_p2p_payment():
 
 
 def test_get_own_p2p_order_history():
-    orders = w.get_own_p2p_order_history(status='ALL_COMPLETED')
+    orders = w.get_own_p2p_order_history(status='COMPLETED_FOR_REQUESTER')
     for o in orders:
         check_api_update(o)
 
 
 def test_get_p2p_order():
-    o = w.get_own_p2p_order_history(status='ALL_COMPLETED')[0]
+    o = w.get_own_p2p_order_history(status='CANCELLED_OR_CANCELLING')[0]
     check_api_update(
         w.get_p2p_order(order_id=o.id)
     )
@@ -38,9 +38,9 @@ def test_create_p2p_order_SALE():
 
     new_offer = w.create_p2p_offer(
         comment='',
-        currency='TON',
+        currency='USDT',
         fiat='RUB',
-        amount=5,
+        amount=10,
         margine=120,
         offer_type='SALE',
         order_min_price=500,
@@ -53,7 +53,7 @@ def test_create_p2p_order_SALE():
 def test_create_p2p_order_PURCHASE():
     new_offer = w.create_p2p_offer(
         comment='',
-        currency='TON',
+        currency='USDT',
         fiat='RUB',
         amount=10,
         margine=90,
