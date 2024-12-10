@@ -22,6 +22,7 @@ class BalanceAccount:
     has_transactions: bool
     addresses: list[AccountAddress]
     rate: float
+    is_created: bool
     unknown_things: CatchAll = None
 
 

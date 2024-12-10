@@ -1,6 +1,7 @@
 import hashlib
 import time
 import uuid
+from typing import Optional, Literal
 
 import requests
 
@@ -41,20 +42,19 @@ class Wallet:
             self.auth_token = f.read()
 
     def request(self, path: str, api_version: str = "api/v1", method: str = "GET", json_data=None, params=None,
-                max_attempts=3):
+                max_attempts=3, endpoint_name: Optional[Literal['p2p', "main"]] = 'main', auth_type_bearer=True):
 
-        public_apis = ['p2p/public-api/v2', 'users/public-api/v2', 'rates/public-api/v1']
+        if endpoint_name == 'p2p':
+            url = f"{self.endpoint_p2p}/{api_version}/{path}"
+        elif endpoint_name == 'main':
+            url = f"{self.endpoint}/{api_version}/{path}"
+        else:
+            raise Exception(f'[!] Wrong Endpoint Name "{endpoint_name}"!')
 
-        if api_version in public_apis or api_version == 'v2api':
+        if auth_type_bearer:
             self.session.headers['authorization'] = 'Bearer ' + self.auth_token
-
-            if api_version == 'p2p/public-api/v2':
-                url = f"{self.endpoint_p2p}/{api_version}/{path}"
-            else:
-                url = f"{self.endpoint}/{api_version}/{path}"
         else:
             self.session.headers['authorization'] = self.auth_token
-            url = f"{self.endpoint}/{api_version}/{path}"
 
         counter = 0
         while counter < max_attempts:
@@ -67,12 +67,17 @@ class Wallet:
                     if self.log_response:
                         print(response.text)
                     jdata = response.json()
-                    if api_version in public_apis:
-                        if jdata['status'] == 'SUCCESS':
+
+                    if type(jdata) is list:
+                        return jdata
+
+                    status = jdata.get("status")
+                    if status:
+                        if status == 'SUCCESS' or status == "success":
                             if 'data' in jdata:
                                 return jdata['data']
                             else:
-                                return True
+                                return jdata
                         else:
                             raise Exception(f'Bad request status: {jdata["status"]}')
                     else:
@@ -99,7 +104,7 @@ class Wallet:
         :param currency: TON NOT BTC USDT
         :return:
         """
-        balances: Balances = Balances.from_dict(self.request(f'accounts/'))
+        balances: Balances = Balances.from_dict(self.request(f'accounts/', auth_type_bearer=False))
         if currency:
             for a in balances.accounts:
                 if a.currency == currency:
@@ -125,7 +130,7 @@ class Wallet:
             'transaction_type': transaction_type,
             'transaction_gateway': transaction_gateway
         }
-        return TxResponse.from_dict(self.request(f'transactions/', params=params)).transactions
+        return TxResponse.from_dict(self.request(f'transactions/', params=params, auth_type_bearer=False)).transactions
 
     def get_transaction_details(self, tx_id: int) -> TxDetails:
         """ One tx info
@@ -134,7 +139,7 @@ class Wallet:
         :return:
         """
 
-        return TxDetails.from_dict(self.request(f'transactions/details/{tx_id}/'))
+        return TxDetails.from_dict(self.request(f'transactions/details/{tx_id}/', auth_type_bearer=False))
 
     def get_passcode_info(self) -> dict:
         return self.request(f'passcode/info', api_version='v2api')
@@ -157,7 +162,7 @@ class Wallet:
         :param crypto_currency: TON
         :return:
         """
-        return self.request(f'users/get_or_create_wallets/{crypto_currency}')
+        return self.request(f'users/get_or_create_wallets/{crypto_currency}', auth_type_bearer=False)
 
     def get_exchange_pair_info(self, from_currency: str, to_currency=str, from_amount: float = 1) -> dict:
         """
@@ -172,7 +177,7 @@ class Wallet:
             "from_currency": from_currency,
             "to_currency": to_currency
         }
-        return self.request('exchange/convert/', method='POST', json_data=data)
+        return self.request('exchange/convert/', method='POST', json_data=data, auth_type_bearer=False)
 
     def create_exchange(self, from_currency: str, to_currency: str, from_amount: float, local_currency: str):
         """
@@ -206,10 +211,10 @@ class Wallet:
             "to_currency": to_currency,
             "local_currency": local_currency
         }
-        return self.request('exchange/create_exchange/', method='POST', json_data=data)
+        return self.request('exchange/create_exchange/', method='POST', json_data=data, auth_type_bearer=False)
 
     def submit_exchange(self, uid):
-        return self.request(f'exchange/submit_exchange/{uid}/', method='POST')
+        return self.request(f'exchange/submit_exchange/{uid}/', method='POST', auth_type_bearer=False)
 
     def get_available_exchanges(self):
         """
@@ -224,12 +229,21 @@ class Wallet:
         data = {'deviceId': hashlib.md5(uuid.UUID(int=uuid.getnode()).hex.encode('utf-8')).hexdigest()[:20]}
         return self.request('user/get', api_version='users/public-api/v2', method='POST', json_data=data)
 
+    def get_own_p2p_permissions(self):
+        """
+        return { 'can_buy': True, 'can_top_up': True, 'can_exchange': True, 'can_withdraw_inner': True,
+        'can_withdraw_outer': True, 'can_use_wpay_as_payer': True, 'can_use_wpay_as_merchant': True,
+        'can_usdt_raffle': False, 'can_use_p2p': True } :return:
+        """
+        return self.request('users/permissions/', api_version='api/v1', method='GET', auth_type_bearer=False)
+
     def get_user_p2p_payments(self) -> dict:
         """ List own payment methods
 
         :return:
         """
-        return self.request('payment-details/get/by-user-id', api_version='p2p/public-api/v2', method='POST')
+        return self.request('payment-details/get/by-user-id', api_version='p2p/public-api/v3', method='POST',
+                            endpoint_name="p2p")
 
     def get_supported_p2p_fiat(self):
         """
@@ -265,7 +279,7 @@ class Wallet:
             "offer/order/history/get-by-user-id",
             method='POST',
             api_version='p2p/public-api/v2',
-            json_data=data)
+            json_data=data, endpoint_name="p2p")
 
         return [OrderHistory.from_dict(o) for o in orders_raw]
 
@@ -300,15 +314,55 @@ class Wallet:
         data = {"currencyCode": currency}
         return self.request(
             'payment-details/get-methods/by-currency-code',
-            api_version='p2p/public-api/v2',
+            api_version=f'p2p/public-api/v3',
             method='POST',
-            json_data=data)
+            json_data=data, endpoint_name="p2p")
 
-    def create_p2p_offer(self, currency: str, amount: float, fiat: str, margine: int, offer_type: str,
-                         order_min_price: int, pay_methods: list, comment: str = None, price_type: str = "FLOATING",
-                         confirm_timeout_tag: str = "PT15M") -> Offer:
+    def create_p2p_order(self, offer_id: int, payment_details_id: int, offer_type, currency_code: str, amount: float):
+        """ Create order. To confirm this order -> confirm_p2p_order
+
+        :param offer_id:
+        :param payment_details_id:
+        :param offer_type: PURCHASE | SALE
+        :param currency_code: USDT
+        :param amount:
+        :return:
+        """
+        data = {
+            "offerId": offer_id,
+            "paymentDetailsId": payment_details_id,
+            "volume": {
+                "currencyCode": currency_code,
+                "amount": amount
+            },
+            "type": offer_type
+        }
+        return self.request('offer/order/create-by-volume', api_version='p2p/public-api/v2', method='POST',
+                            json_data=data, endpoint_name="p2p")
+
+    def confirm_p2p_order(self, order_id, order_type):
         """
 
+        :param order_id:
+        :param order_type:
+        :return:
+        """
+
+        data = {
+            'orderId': order_id,
+            'type': order_type,
+        }
+        return Order.from_dict(
+            self.request('offer/order/confirm', api_version='p2p/public-api/v2', method='POST', json_data=data,
+                         endpoint_name='p2p'))
+
+    def create_p2p_offer(self, currency: str, amount: float, fiat: str, margine: int, offer_type: str,
+                         order_min_price: float, pay_methods: list, comment: str = None, price_type: str = "FLOATING",
+                         confirm_timeout_tag: str = "PT15M", order_max_price: float | None = None,
+                         order_rounding_required=False) -> Offer:
+        """
+
+        :param order_rounding_required:
         :param pay_methods: list of payment methods ids or list of payment methods codes
             if SALE - get_user_p2p_payments()
             if PURCHASE - get_p2p_payment_methods_by_currency()
@@ -316,6 +370,7 @@ class Wallet:
         :param confirm_timeout_tag: PT15M PT5M PT10M
         :param comment:
         :param order_min_price:
+        :param order_max_price:
         :param margine: 90 - 120
         :param fiat: RUB | KZT etc...
         :param price_type: FLOATING | FIXED
@@ -326,22 +381,24 @@ class Wallet:
         """
 
         data = {
-            "type": offer_type,
+            "comment": comment,
             "initVolume": {
                 "currencyCode": currency,
                 "amount": str(amount)
             },
+            "orderAmountLimits": {
+                "min": order_min_price,
+                "max": order_max_price
+            },
+            "orderRoundingRequired": order_rounding_required,
+            "paymentConfirmTimeout": confirm_timeout_tag,
             "price": {
                 "type": price_type,
                 "baseCurrencyCode": currency,
                 "quoteCurrencyCode": fiat,
                 "value": margine
             },
-            "orderAmountLimits": {
-                "min": order_min_price
-            },
-            "paymentConfirmTimeout": confirm_timeout_tag,
-            "comment": comment,
+            "type": offer_type,
         }
 
         if offer_type == 'PURCHASE':
@@ -350,24 +407,29 @@ class Wallet:
             data['paymentDetailsIds'] = pay_methods
 
         return Offer.from_dict(
-            self.request('offer/create', api_version='p2p/public-api/v2', method='POST', json_data=data))
+            self.request('offer/create', api_version='p2p/public-api/v2', method='POST', json_data=data,
+                         endpoint_name='p2p'))
 
     def activate_p2p_offer(self, offer_id, offer_type):
         data = {"type": offer_type, "offerId": offer_id}
-        return self.request('offer/activate', api_version='p2p/public-api/v2', method='POST', json_data=data)
+        return self.request('offer/activate', api_version='p2p/public-api/v2', method='POST', json_data=data,
+                            endpoint_name="p2p")
 
     def deactivate_p2p_offer(self, offer_id, offer_type):
         data = {
             "type": offer_type,
             "offerId": offer_id
         }
-        return self.request('offer/deactivate', api_version='p2p/public-api/v2', method='POST', json_data=data)
+        return self.request('offer/deactivate', api_version='p2p/public-api/v2', method='POST', json_data=data,
+                            endpoint_name="p2p")
 
     def disable_p2p_bidding(self):
-        return self.request('user-settings/disable-bidding', api_version='p2p/public-api/v2', method='POST')
+        return self.request('user-settings/disable-bidding', api_version='p2p/public-api/v2', method='POST',
+                            endpoint_name="p2p")
 
     def enable_p2p_bidding(self):
-        return self.request('user-settings/enable-bidding', api_version='p2p/public-api/v2', method='POST')
+        return self.request('user-settings/enable-bidding', api_version='p2p/public-api/v2', method='POST',
+                            endpoint_name="p2p")
 
     def get_own_p2p_offers(self, offset: int = 0, limit: int = 10,
                            offer_type: str = 'PURCHASE', status: str | None = None) -> list[Offer]:
@@ -444,7 +506,8 @@ class Wallet:
             data['comment'] = comment
 
         return Offer.from_dict(
-            self.request('offer/edit', api_version='p2p/public-api/v2', method='POST', json_data=data))
+            self.request('offer/edit', api_version='p2p/public-api/v2', method='POST', json_data=data,
+                         endpoint_name='p2p'))
 
     def accept_p2p_order(self, order_id: int, offer_type: str) -> Order:
         """
@@ -458,10 +521,12 @@ class Wallet:
             'type': offer_type,
         }
         return Order.from_dict(
-            self.request('offer/order/accept', api_version='p2p/public-api/v2', method='POST', json_data=data))
+            self.request('offer/order/accept', api_version='p2p/public-api/v2', method='POST', json_data=data,
+                         endpoint_name='p2p'))
 
     def get_p2p_market(self, base_currency_code: str, quote_currency_code: str, offer_type='SALE', offset=0, limit=100,
-                       desired_amount=None, payment_method_codes: list = None) -> list[MarketOffer]:
+                       desired_amount=None, payment_method_codes: list = None,
+                       merchant_verified: Optional[Literal[None, "VERIFIED", "TRUSTED"]] = None) -> list[MarketOffer]:
         """
 
         :param payment_method_codes: ["sbp", "sberbankru"] - use get_p2p_payment_methods_by_currency() to get needed method code
@@ -471,6 +536,7 @@ class Wallet:
         :param offer_type: SALE | PURCHASE
         :param offset:
         :param limit:
+        :param merchant_verified: str "VERIFIED" | "TRUSTED" | None (All)
         :return:
         """
         data = {
@@ -480,7 +546,8 @@ class Wallet:
             "offset": offset,
             "limit": limit,
             "desiredAmount": desired_amount,
-            "paymentMethodCodes": payment_method_codes
+            "paymentMethodCodes": payment_method_codes,
+            "merchantVerified": merchant_verified
         }
         market = self.request(
             'offer/depth-of-market', api_version='p2p/public-api/v2', method='POST', json_data=data)

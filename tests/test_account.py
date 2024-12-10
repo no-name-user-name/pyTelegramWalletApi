@@ -21,7 +21,7 @@ def test_get_transactions():
 
 def test_get_transaction_details():
     check_api_update(
-        w.get_transaction_details(tx_id=49159406)
+        w.get_transaction_details(tx_id=199165225)
     )
 
 
@@ -31,6 +31,10 @@ def test_get_passcode_info():
 
 def test_get_recovery_email():
     assert 'email' in w.get_recovery_email('wallet')
+
+
+def test_get_user_region_verification():
+    assert 'blockedPermissions' in w.get_user_region_verification()
 
 
 def test_get_wallet():
