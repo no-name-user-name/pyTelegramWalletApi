@@ -8,6 +8,10 @@ def test_get_own_info():
     assert 'nickname' in w.get_own_p2p_user_info()
 
 
+def test_get_own_permissions():
+    print(w.get_own_p2p_permissions())
+
+
 def test_get_user_p2p_payment():
     assert 'name' in w.get_user_p2p_payments()[0]
 
@@ -44,7 +48,9 @@ def test_create_p2p_order_SALE():
         margine=120,
         offer_type='SALE',
         order_min_price=500,
+        order_max_price=1000,
         pay_methods=[pid],
+        order_rounding_required=True,
     )
     check_api_update(new_offer)
     w.activate_p2p_offer(new_offer.id, new_offer.type)
@@ -65,10 +71,18 @@ def test_create_p2p_order_PURCHASE():
     w.activate_p2p_offer(new_offer.id, new_offer.type)
 
 
+def test_enable_p2p_bidding():
+    assert w.enable_p2p_bidding()
+
+
+def test_disable_p2p_bidding():
+    assert w.disable_p2p_bidding()
+
+
 def test_edit_p2p_offer():
     offer = w.get_own_p2p_offers()[0]
     check_api_update(
-        w.edit_p2p_offer(offer.id, volume=4, comment='Test')
+        w.edit_p2p_offer(offer.id, volume=11, comment='Test')
     )
 
 
@@ -99,17 +113,15 @@ def test_accept_p2p_order():
     )
 
 
-def test_enable_p2p_bidding():
-    assert w.enable_p2p_bidding()
-
-
-def test_disable_p2p_bidding():
-    assert w.disable_p2p_bidding()
-
-
 def test_get_p2p_market():
     check_api_update(
         w.get_p2p_market('TON', 'RUB', 'SALE')[0]
+    )
+
+
+def test_get_p2p_market_verified():
+    check_api_update(
+        w.get_p2p_market('TON', 'RUB', 'SALE', merchant_verified="VERIFIED")[0]
     )
 
 

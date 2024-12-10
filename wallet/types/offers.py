@@ -1,5 +1,6 @@
 import pprint
 from dataclasses import dataclass, asdict
+from typing import Literal
 
 from dataclasses_json import dataclass_json, Undefined, CatchAll
 
@@ -35,6 +36,7 @@ class AmountLimits:
     min: float
     max: float
     approximate: bool
+    makerDefinedMax: str | None = None
     unknown_things: CatchAll = None
 
 
@@ -60,6 +62,7 @@ class PaymentMethod:
     @staticmethod
     def to_dict():
         pass
+
 
 @dataclass_json(undefined=Undefined.INCLUDE)
 @dataclass
@@ -90,6 +93,8 @@ class User:
     avatarCode: str
     statistics: Statistics
     isVerified: bool
+    onlineStatus: Literal["ONLINE", "OFFLINE"]
+    lastOnlineMinutesAgo: int | None = None
     unknown_things: CatchAll = None
 
 
@@ -147,8 +152,16 @@ class PaymentDetailsHistory:
 @dataclass
 class Fee:
     rate: float
-    initVolume: Volume
+    # initVolume: Volume
     availableVolume: Volume
+    unknown_things: CatchAll = None
+
+
+@dataclass_json(undefined=Undefined.INCLUDE)
+@dataclass
+class OrderRounding:
+    mode: str
+    scale: float
     unknown_things: CatchAll = None
 
 
@@ -162,12 +175,13 @@ class Offer:
     availableVolume: AvailableVolume
     orderAmountLimits: AmountLimits
     orderVolumeLimits: OrderVolumeLimits
+    orderRounding: OrderRounding | None = None
     status: str | None = None
     changeLog: ChangeLog | None = None
     comment: str | None = None
     createDateTime: str | None = None
     paymentConfirmTimeout: str | None = None
-    initVolume: Volume | None = None
+    # initVolume: Volume | None = None
     user: User | None = None
     paymentMethods: list[PaymentMethod] | None = None
     fee: Fee | None = None
@@ -229,6 +243,7 @@ class Order:
     holdRestrictionsWillBeApplied: bool
     status: str
     changeLog: ChangeLog
+    buyerSendingPaymentConfirmationTimeout: str
     confirmationDateTime: str | None
     statusUpdateDateTime: str | None
     cancelReason: str | None = None
